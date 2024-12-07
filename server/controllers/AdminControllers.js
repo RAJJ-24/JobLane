@@ -1,256 +1,56 @@
-const Job = require('../models/JobModel')
-const User = require('../models/UserModel')
-const Application = require('../models/AppModel')
-const cloudinary = require('cloudinary')
+const bcrypt = require('bcrypt');
 
+// Change Admin Password
+exports.changeAdminPassword = async (req, res) => {
+    try {
+        // Check if the logged-in user is the admin
+        const adminEmail = 'admin@ex.com';  // Fixed admin email
+        const adminPassword = 'admin';      // Fixed admin password
 
-// Get all jobs
-exports.getAllJobs = async (req,res) => {
-    try{
-        const jobs = await Job.find() ;
+        const { currentPassword, newPassword } = req.body;
 
-        res.status(200).json({
-            success: true,
-            jobs
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }                
-}
-
-// Get all Users
-exports.getAllUsers = async (req,res) => {
-    try{
-        const users = await User.find() ;
-
-        res.status(200).json({
-            success: true,
-            users
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }
-}
-
-// Get all applications
-exports.getAllApp = async (req,res) => {
-    try{
-        const applications = await Application.find().populate("job applicant") ;
-
-        res.status(200).json({
-            success: true,
-            applications
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }
-}
-
-// Update Application Status
-exports.updateApplication = async (req,res) => {
-    try{
-
-        const application = await Application.findById(req.params.id) ;
-
-        application.status = req.body.status ;
-
-        await application.save() ;
-
-        res.status(200).json({
-            success: true,
-            message: "Application Updated"
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }
-}
-// Delete Application
-exports.deleteApplication = async (req,res) => {
-    try{
-
-        const application = await Application.findByIdAndRemove(req.params.id) ;
-
-        res.status(200).json({
-            success: true ,
-            message: "Application Deleted"
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }
-}
-// Get Application
-exports.getApplication = async (req,res) => {
-    try{
-        const application = await Application.findById(req.params.id).populate("job applicant") ;
-
-        res.status(200).json({
-            success: true,
-            application
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }
-}
-
-
-// Update User Role
-exports.updateUser = async (req,res) => {
-    try{
-        const user = await User.findById(req.params.id) ;
-
-        user.role = req.body.role ;
-
-        await user.save() ;
-
-        res.status(200).json({
-            success: true,
-            message: "User Updated"
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }
-}
-
-// Delete User
-exports.deleteUser = async (req,res) => {
-    try{
-        const user = await User.findByIdAndRemove(req.params.id) ;
-
-        res.status(200).json({
-            success: true,
-            message: "User Deleted"
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }
-}
-
-// Get User
-exports.getUser = async (req,res) => {
-    try{
-        const user = await User.findById(req.params.id) ;
-
-        res.status(200).json({
-            success: true,
-            user
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }
-}
-
-
-// Update Job
-exports.updateJob = async (req,res) => {
-    try{    
-
-        const job = await Job.findById(req.params.id) ;
-
-        const logoToDelete_Id = job.companyLogo.public_id ;
-
-        await cloudinary.v2.uploader.destroy(logoToDelete_Id) ;
-
-        const logo = req.body.companyLogo  ;
-
-        const myCloud = await cloudinary.v2.uploader.upload(logo, {
-            folder: 'logo',
-            crop: "scale",
-        })
-
-        req.body.companyLogo = {
-            public_id: myCloud.public_id,
-            url: myCloud.secure_url
+        // Check if the logged-in user is the admin
+        if (req.user.email !== adminEmail) {
+            return res.status(403).json({
+                success: false,
+                message: 'Only admin can change the password.',
+            });
         }
 
-        const updatedJob = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true }) ;
+        // Compare the current password with the fixed one
+        const isMatch = currentPassword === adminPassword;
+        if (!isMatch) {
+            return res.status(400).json({
+                success: false,
+                message: 'Current password is incorrect',
+            });
+        }
 
+        // Hash the new password
+        const hashedNewPassword = await bcrypt.hash(newPassword, 12);
         
+        // Update the admin password
+        const admin = await User.findOneAndUpdate(
+            { email: adminEmail },
+            { password: hashedNewPassword },
+            { new: true }
+        );
+
+        if (!admin) {
+            return res.status(404).json({
+                success: false,
+                message: 'Admin user not found',
+            });
+        }
 
         res.status(200).json({
             success: true,
-            message: "Job Updated"
-        })
-
-    }catch(err){
+            message: 'Password updated successfully',
+        });
+    } catch (err) {
         res.status(500).json({
             success: false,
-            message: err.message
-        })
+            message: err.message,
+        });
     }
-}
-
-
-// Get Single Job
-exports.getJob = async (req,res) => {
-    try{    
-
-        const job = await Job.findById(req.params.id)
-
-        res.status(200).json({
-            success: true,
-            job
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }
-}
-
-
-// Delete Single Job
-exports.deleteJob = async (req,res) => {
-    try{    
-
-        const job = await Job.findByIdAndRemove(req.params.id)
-
-        res.status(200).json({
-            success: true,
-            message: "Job Deleted"
-        })
-
-    }catch(err){
-        res.status(500).json({
-            success: false,
-            message: err.message
-        })
-    }
-}
+};
